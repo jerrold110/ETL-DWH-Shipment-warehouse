@@ -5,11 +5,12 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
+from airflow.sensors.filesystem import FileSensor
+#from airflow.contrib.sensors.file_sensor import FileSensor
 
-# importETL scripts 
+# import ETL scripts 
 from scripts.s3_extract import extract
-from scripts.spark_transform import transform
-#from scripts.spark_test import transform
+from scripts.spark_transform_load import transform_load
 
 default_arguments = {
         "depends_on_past": False,
@@ -32,6 +33,12 @@ default_arguments = {
         # 'sla_miss_callback': yet_another_function, # or list of functions
         # 'trigger_rule': 'all_success'
     	}
+    	
+from datetime import datetime
+job_timestamp = datetime.now().replace(microsecond=0)
+job_timestamp = datetime(2023, 11, 30, 0, 0,0)
+print(f'extracted_data/{job_timestamp}/Customers.csv')
+#print('extracted_data/2023-11-30 00:00:00/Customers.csv')
 	
 with DAG(
     dag_id="Etl_test_1",
@@ -45,16 +52,36 @@ with DAG(
     tags=["example"]
 	) as dag:
 
-    t1 = PythonOperator(
-    	task_id='Extract',
-        python_callable=extract,
-        sla=timedelta(hours=1)
-        )
-        
-    t2 = PythonOperator(
-    	task_id='Transform',
-        python_callable=transform,
-        sla=timedelta(hours=1)
-        )
+	t1 = PythonOperator(
+		task_id='extract',
+		python_callable=extract,
+		sla=timedelta(hours=1),
+		op_kwargs={'job_timestamp':job_timestamp}
+		)
+         
+	fs1 = FileSensor(
+		task_id="check_file_1",
+		fs_conn_id='my_path_1',
+		filepath=f'extracted_data/{job_timestamp}/Customers.csv',
+		poke_interval=1,
+		timeout=5,
+		mede='poke'
+		)
+		
+	fs2 = FileSensor(
+		task_id="check_file_1",
+		fs_conn_id='my_path_1',
+		filepath=f'extracted_data/{job_timestamp}/Shipments.csv',
+		poke_interval=1,
+		timeout=5,
+		mede='poke'
+		)
+		
+	t2 = PythonOperator(
+		task_id='transform_load',
+		python_callable=transform_load,
+		sla=timedelta(hours=1),
+		op_kwargs={'job_timestamp':job_timestamp}
+		)
 
-    t1 >> t2
+	t1 >> fs1 >> f2 >> t2

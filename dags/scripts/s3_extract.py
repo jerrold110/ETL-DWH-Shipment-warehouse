@@ -1,7 +1,7 @@
 import boto3
 import os
 
-def extract():
+def extract(job_timestamp):
 	"""
 	Ensure that Aws cli configuration with IAM is already done to resolve authentication issues
 	"""
@@ -11,21 +11,21 @@ def extract():
 		print('Creating extracted_data folder')
 		os.makedirs('./extracted_data')
 	
-	s3 = boto3.resource('s3')
+	isExist = os.path.exists(f'./extracted_data/{job_timestamp}')
+	if not isExist:
+		os.makedirs(f'./extracted_data/{job_timestamp}')
 
 	# Downloads Customers.csv to path relative to the current working directory
-	s3.Object(bucket_name='test-project-j2400-2', key='Customers.csv')\
-	.download_file('./extracted_data/Customers.csv')
-
-	s3.Object(bucket_name='test-project-j2400-2', key='Shipments.csv')\
-	.download_file('./extracted_data/Shipments.csv')
+	s3 = boto3.resource('s3')
 	
+	s3.Object(bucket_name='test-project-j2400-2', key='Shipments.csv')\
+	.download_file(f'./extracted_data/{job_timestamp}/Shipments.csv')
+	
+	s3.Object(bucket_name='test-project-j2400-2', key='Customers.csv')\
+	.download_file(f'./extracted_data/{job_timestamp}/Customers.csv')
+
 	print('Python extract done')
 
-	# Data quality checks
-	"""
-
-	"""
-
 if __name__ == '__main__':
-	extract()
+	from datetime import datetime
+	extract(datetime(2011, 3, 29, 0, 0,0))
